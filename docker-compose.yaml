@@ -1,0 +1,134 @@
+services:
+  app:
+    build: .
+    environment:
+      - DB_CONNECTION_STRING=${DB_CONNECTION_STRING:-postgres://postgres:[PASSWORD]@postgres:5432/postgres}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
+      - PADDLE_API_URI=${PADDLE_API_URI:-https://api.paddle.com/}
+      - PADDLE_API_KEY=${PADDLE_API_KEY}
+      - PUBLIC_PADDLE_CLIENT_TOKEN=${PUBLIC_PADDLE_CLIENT_TOKEN}
+      - PADDLE_PRODUCTS_WEBHOOK_KEY=${PADDLE_PRODUCTS_WEBHOOK_KEY}
+      - PADDLE_SUBSCRIPTION_WEBHOOK_KEY=${PADDLE_SUBSCRIPTION_WEBHOOK_KEY}
+      - PLUNK_URL=${PLUNK_APP_URI}
+      - PLUNK_SECRET_KEY=${JWT_SECRET_PLUNK}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?}
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./migrations/init:/docker-entrypoint-initdb.d
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} -p 5432"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    environment:
+      - DATABASE_URL=${UMAMI_DB_URL:-postgres://postgres:[PASSWORD]@postgres-umami:5433/umami}
+      - DATABASE_TYPE=postgres
+      - PORT=4000
+    depends_on:
+      postgres-umami:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:4000/api/heartbeat"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  postgres-umami:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=${UMAMI_POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${UMAMI_POSTGRES_PASSWORD:?}
+      - POSTGRES_DB=${UMAMI_POSTGRES_DB:-umami}
+    ports:
+      - "5433:5433"
+    volumes:
+      - postgres_data_umami:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} -p 5433"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    command: -p 5433
+
+  plunk:
+    image: driaug/plunk:latest
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=${PLUNK_DB_URL:-postgresql://postgres:[PASSWORD]@postgres-plunk:5434/plunk?schema=public}
+      - JWT_SECRET=${PLUNK_JWT_SECRET}
+      - AWS_REGION=${AWS_REGION:-AWS_REGION}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-AWS_SECRET_ACCESS_KEY}
+      - AWS_SES_CONFIGURATION_SET=${AWS_SES_CONFIGURATION_SET:-AWS_SES_CONFIGURATION_SET}
+      - APP_URI=${PLUNK_APP_URI}
+      - API_URI=${PLUNK_API_URI}
+      - NEXT_PUBLIC_API_URI=${PLUNK_API_URI}
+      - DISABLE_SIGNUPS=${DISABLE_SIGNUPS:-False}
+    entrypoint: [ "/app/entry.sh" ]
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres-plunk:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  postgres-plunk:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=${PLUNK_DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${PLUNK_DB_PASSWORD:?}
+      - POSTGRES_DB=${PLUNK_DB:-plunk}
+    ports:
+      - "5434:5434"
+    volumes:
+      - postgres_data_plunk:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} -p 5434"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    command: -p 5434
+
+  redis:
+    image: redis:7.4-alpine
+    volumes:
+      - plunk_redis_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - PING
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+volumes:
+  postgres_data:
+  umami_postgres_data:
+  plunk_postgres_data:
+  plunk_redis_data:
