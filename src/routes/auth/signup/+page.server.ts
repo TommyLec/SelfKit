@@ -1,5 +1,5 @@
 import { get2FARedirect } from '$lib/server/auth/2fa';
-import { verifyEmailInput, checkEmailAvailability } from '$lib/server/auth/email';
+import { checkEmailAvailability } from '$lib/server/auth/email';
 import {
 	createEmailVerificationRequest,
 	sendVerificationEmail,
@@ -16,10 +16,13 @@ import {
 import { createUser } from '$lib/server/auth/user';
 import { fail, redirect, type Actions, type RequestEvent } from '@sveltejs/kit';
 import type { PageServerLoadEvent } from '../$types';
+import { superValidate, setError } from 'sveltekit-superforms';
+import { zod } from 'sveltekit-superforms/adapters';
+import { signupSchema } from '$lib/forms/schemas/signupSchema';
 
 const ipBucket = new RefillingTokenBucket<string>(3, 10);
 
-export function load(event: PageServerLoadEvent) {
+export async function load(event: PageServerLoadEvent) {
 	if (event.locals.session !== null && event.locals.user !== null) {
 		if (!event.locals.user.emailVerified) {
 			return redirect(302, '/auth/verify-email');
@@ -33,8 +36,11 @@ export function load(event: PageServerLoadEvent) {
 		return redirect(302, '/');
 	}
 	return {
-		pageName: "Create Account",
-		description: "Join us by creating your secure account. Get started with our platform and access all features with your personal dashboard"
+		form: await superValidate(zod(signupSchema)),
+		// For meta tags
+		pageName: 'Create Account',
+		description:
+			'Join us by creating your secure account. Get started with our platform and access all features with your personal dashboard'
 	};
 }
 
@@ -43,54 +49,30 @@ export const actions: Actions = {
 };
 
 async function action(event: RequestEvent) {
-	const clientIP = event.request.headers.get('X-Forwarded-For');
-	if (clientIP !== null && !ipBucket.check(clientIP, 1)) {
-		return fail(429, {
-			message: 'Too many requests',
-			email: ''
+	const form = await superValidate(event, zod(signupSchema));
+	if (!form.valid) {
+		return fail(400, {
+			form
 		});
 	}
 
-	const formData = await event.request.formData();
-	const email = formData.get('email');
-	const password = formData.get('password');
-	if (typeof email !== 'string' || typeof password !== 'string') {
-		return fail(400, {
-			message: 'Invalid or missing fields',
-			email: ''
-		});
+	const clientIP = event.request.headers.get('X-Forwarded-For');
+	if (clientIP !== null && !ipBucket.check(clientIP, 1)) {
+		return setError(form, 'email', 'Too many requests. Please try again later.');
 	}
-	if (email === '' || password === '') {
-		return fail(400, {
-			message: 'Please enter your email, and password',
-			email: ''
-		});
-	}
-	if (!verifyEmailInput(email)) {
-		return fail(400, {
-			message: 'Invalid email',
-			email
-		});
-	}
+
+	const { email, password } = form.data;
+
 	const emailAvailable = await checkEmailAvailability(email);
 	if (!emailAvailable) {
-		return fail(400, {
-			message: 'Email is already used',
-			email
-		});
+		return setError(form, 'email', 'This email is already used.');
 	}
 	const strongPassword = await verifyPasswordStrength(password);
 	if (!strongPassword) {
-		return fail(400, {
-			message: 'Weak password',
-			email
-		});
+		return setError(form, 'password', 'Weak password.');
 	}
 	if (clientIP !== null && !ipBucket.consume(clientIP, 1)) {
-		return fail(429, {
-			message: 'Too many requests',
-			email
-		});
+		return setError(form, 'email', 'Too many requests. Please try again later.');
 	}
 	const user = await createUser(email, password);
 	const emailVerificationRequest = await createEmailVerificationRequest(user.id, user.email);
@@ -103,5 +85,6 @@ async function action(event: RequestEvent) {
 	const sessionToken = generateSessionToken();
 	const session = await createSession(sessionToken, user.id, sessionFlags);
 	setSessionTokenCookie(event, sessionToken, session.expiresAt);
+
 	throw redirect(302, '/auth/2fa/setup');
 }

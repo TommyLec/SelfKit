@@ -15,7 +15,7 @@
 			<h1 class="text-2xl font-bold">{m.key_fluffy_toucan_reap()}</h1>
 		</div>
 		<div class="grid gap-3">
-			<form class="flex flex-col gap-3 items-center" method="post" use:enhance>
+			<form class="flex flex-col gap-3 items-center" method="post" action="?/verify" use:enhance>
 				<p class="text-muted-foreground">{m.every_muddy_rook_yell()} {data.email}.</p>
 				<InputOTP.Root
 					maxlength={8}
@@ -47,7 +47,8 @@
 		{#if data.user?.useProvider}
 			<Separator />
 			<p class="text-muted-foreground text-sm">
-				{m.mealy_flat_goldfish_jolt()} <a class="underline hover:text-primary" href="/account/settings"
+				{m.mealy_flat_goldfish_jolt()}
+				<a class="underline hover:text-primary" href="/account/settings"
 					>{m.mealy_tidy_reindeer_lead()}</a
 				>
 			</p>

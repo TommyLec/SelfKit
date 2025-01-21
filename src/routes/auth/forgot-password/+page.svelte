@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
+	import ForgotPasswordForm from '$lib/components/forms/forgotPasswordForm.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
-	import Input from '$lib/components/ui/input/input.svelte';
+	import { type ForgotPasswordSchema } from '$lib/forms/schemas/forgotPasswordSchema';
 	import * as m from '$lib/paraglide/messages.js';
+	import type { SuperValidated, Infer } from 'sveltekit-superforms';
 
-	let { form } = $props();
+	let { data }: { data: { form: SuperValidated<Infer<ForgotPasswordSchema>> } } = $props();
 </script>
 
 <div class="  mx-auto sm:max-w-[350px] p-5 sm:p-0">
@@ -15,18 +16,8 @@
 				{m.funny_next_midge_greet()}
 			</p>
 		</div>
-		<form class="grid gap-2" method="post" use:enhance>
-			<Input
-				type="email"
-				id="form-forgot.email"
-				name="email"
-				required
-				value={form?.email ?? ''}
-				placeholder="Email"
-			/>
-			<Button type="submit" class="w-full">{m.nimble_late_lemur_amaze()}</Button>
-			<p>{form?.message ?? ''}</p>
-		</form>
+
+		<ForgotPasswordForm form={data.form} />
 
 		<div class="relative">
 			<div class="absolute inset-0 flex items-center"><span class="w-full border-t"></span></div>

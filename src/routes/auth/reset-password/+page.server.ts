@@ -1,3 +1,4 @@
+import { passwordResetSchema } from '$lib/forms/schemas/resetPasswordSchema';
 import { getPasswordReset2FARedirect } from '$lib/server/auth/2fa';
 import { verifyPasswordStrength } from '$lib/server/auth/password';
 import {
@@ -14,6 +15,8 @@ import {
 } from '$lib/server/auth/session';
 import { updateUserPassword } from '$lib/server/auth/user';
 import { fail, redirect, type Actions, type RequestEvent } from '@sveltejs/kit';
+import { superValidate, setError } from 'sveltekit-superforms';
+import { zod } from 'sveltekit-superforms/adapters';
 
 export async function load(event: RequestEvent) {
 	const { session, user } = await validatePasswordResetSessionRequest(event);
@@ -27,9 +30,10 @@ export async function load(event: RequestEvent) {
 		return redirect(302, getPasswordReset2FARedirect(user));
 	}
 	return {
+		form: await superValidate(zod(passwordResetSchema)),
 		// For meta tags
-		pageName: "Reset Password",
-		description: "Create a new password for your account to regain secure access to your dashboard"
+		pageName: 'Reset Password',
+		description: 'Create a new password for your account to regain secure access to your dashboard'
 	};
 }
 
@@ -54,23 +58,23 @@ async function action(event: RequestEvent) {
 			message: 'Forbidden'
 		});
 	}
-	const formData = await event.request.formData();
-	const password = formData.get('password');
-	if (typeof password !== 'string') {
+
+	const form = await superValidate(event, zod(passwordResetSchema));
+	if (!form.valid) {
 		return fail(400, {
-			message: 'Invalid or missing fields'
+			form
 		});
 	}
 
-	const strongPassword = await verifyPasswordStrength(password);
+	const { newPassword } = form.data;
+
+	const strongPassword = await verifyPasswordStrength(newPassword);
 	if (!strongPassword) {
-		return fail(400, {
-			message: 'Weak password'
-		});
+		return setError(form, 'newPassword', 'Weak password.');
 	}
 	await invalidateUserPasswordResetSessions(passwordResetSession.userId);
 	await invalidateUserSessions(passwordResetSession.userId);
-	await updateUserPassword(passwordResetSession.userId, password);
+	await updateUserPassword(passwordResetSession.userId, newPassword);
 
 	const sessionFlags: SessionFlags = {
 		twoFactorVerified: passwordResetSession.twoFactorVerified

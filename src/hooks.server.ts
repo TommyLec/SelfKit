@@ -70,12 +70,12 @@ const authHandle: Handle = async ({ event, resolve }) => {
 
 export const handle = sequence(rateLimitHandle, authHandle, i18n.handle());
 
-export const handleError: HandleServerError = async ({ status, message, error }) => {
+export const handleError: HandleServerError = async ({ status, error }) => {
 	const errorId = crypto.randomUUID();
 
 	if (status === 404) new Response('Redirect', { status: 303, headers: { Location: '/' } });
 
-	console.error(status, message, error)
+	if (error instanceof Error) console.error(error.stack);
 
 	return {
 		code: status,

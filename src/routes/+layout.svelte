@@ -8,6 +8,7 @@
 	import Seo from '$lib/seo/seo.svelte';
 	import Footer from '$lib/components/layout/footer.svelte';
 	import { ModeWatcher } from 'mode-watcher';
+	import { Toaster } from '$lib/components/ui/sonner/index.ts';
 
 	let { data, children } = $props();
 	let { user, subscriptions } = $derived(data);
@@ -24,6 +25,7 @@
 	});
 </script>
 
+<Toaster />
 <ModeWatcher />
 
 <ParaglideJS {i18n}>
@@ -36,7 +38,7 @@
 		imgAlt={page.data.imgAlt}
 	/>
 
-	<Navbar {user} {subscriptions}/>
+	<Navbar {user} {subscriptions} />
 
 	{@render children()}
 

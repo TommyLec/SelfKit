@@ -1,12 +1,28 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
 	import { Button } from '$lib/components/ui/button';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import { encodeBase64 } from '@oslojs/encoding';
 	import * as m from '$lib/paraglide/messages.js';
+	import { type PasswordChangeSchema } from '$lib/forms/schemas/passwordChangeSchema.js';
+	import { type SuperValidated, type Infer } from 'sveltekit-superforms';
+	import type { User } from '$lib/server/auth/user';
+	import type { WebAuthnUserCredential } from '$lib/server/auth/webauthn';
+	import PasswordChangeForm from '$lib/components/forms/passwordChangeForm.svelte';
+	import EmailChangeForm from '$lib/components/forms/emailChangeForm.svelte';
+	import type { EmailChangeSchema } from '$lib/forms/schemas/emailChangeSchema';
+	import { enhance as sEnhance } from '$app/forms';
 
-	let { data, form } = $props();
+	type Props = {
+		recoveryCode: string | null;
+		user: User;
+		passkeyCredentials: WebAuthnUserCredential[];
+		securityKeyCredentials: WebAuthnUserCredential[];
+		emailChangeForm: SuperValidated<Infer<EmailChangeSchema>>;
+		passwordChangeForm: SuperValidated<Infer<PasswordChangeSchema>>;
+	};
+
+	let { data }: { data: Props } = $props();
 </script>
 
 <div class="w-full grid gap-6 px-5 md:px-10 mb-10">
@@ -18,42 +34,9 @@
 	<Separator class="my-4" />
 
 	{#if !data.user.useProvider}
-		<section>
-			<h2>{m.ornate_honest_cuckoo_boil()}</h2>
-			<p class="text-muted-foreground">{m.light_elegant_dachshund_feel()} {data.user.email}</p>
-			<form method="post" use:enhance action="?/update_email">
-				<Input type="email" id="form-email.email" name="email" placeholder="New email" required />
-				<Button variant="secondary" type="submit">{m.whole_loved_barbel_taste()}</Button>
-				<p>{form?.email?.message ?? ''}</p>
-			</form>
-		</section>
-
+		<EmailChangeForm form={data.emailChangeForm} currentEmail={data.user.email} />
 		<Separator class="my-4" />
-
-		<section>
-			<h2>Update password</h2>
-			<form method="post" use:enhance action="?/update_password">
-				<Input
-					type="password"
-					id="form-email.password"
-					name="password"
-					autocomplete="current-password"
-					placeholder="Current password"
-					required
-				/>
-				<Input
-					type="password"
-					id="form-password.new-password"
-					name="new_password"
-					autocomplete="new-password"
-					placeholder="New password"
-					required
-				/>
-				<Button variant="secondary" type="submit">{m.whole_loved_barbel_taste()}</Button>
-				<p>{form?.password?.message ?? ''}</p>
-			</form>
-		</section>
-
+		<PasswordChangeForm form={data.passwordChangeForm} />
 		<Separator class="my-4" />
 	{/if}
 
@@ -63,7 +46,7 @@
 			<Button variant="outline" href="/auth/2fa/totp/setup"
 				>{m.whole_loved_barbel_taste()} TOTP</Button
 			>
-			<form method="post" use:enhance action="?/disconnect_totp">
+			<form method="post" use:sEnhance action="?/disconnect_totp">
 				<Button class="w-full text-destructive" variant="ghost" type="submit"
 					>{m.lime_wild_shell_grace()}</Button
 				>
@@ -84,7 +67,7 @@
 			{#each data.passkeyCredentials as credential}
 				<li>
 					<p>{credential.name}</p>
-					<form method="post" use:enhance action="?/delete_passkey">
+					<form method="post" use:sEnhance action="?/delete_passkey">
 						<Input type="hidden" name="credential_id" value={encodeBase64(credential.id)} />
 						<Button variant="destructive" type="submit">Delete</Button>
 					</form>
@@ -105,7 +88,7 @@
 			{#each data.securityKeyCredentials as credential}
 				<li>
 					<p>{credential.name}</p>
-					<form method="post" use:enhance action="?/delete_security_key">
+					<form method="post" use:sEnhance action="?/delete_security_key">
 						<Input type="hidden" name="credential_id" value={encodeBase64(credential.id)} />
 						<Button variant="destructive" type="submit">{m.short_lucky_mouse_forgive()}</Button>
 					</form>
@@ -122,7 +105,7 @@
 		<section>
 			<h2>{m.wild_east_bullock_snip()}</h2>
 			<p>{m.early_brief_bat_inspire()} {data.recoveryCode}}</p>
-			<form method="post" use:enhance action="?/regenerate_recovery_code">
+			<form method="post" use:sEnhance action="?/regenerate_recovery_code">
 				<Button variant="outline" type="submit">{m.full_vexed_niklas_nail()}</Button>
 			</form>
 		</section>

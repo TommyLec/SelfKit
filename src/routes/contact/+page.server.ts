@@ -1,30 +1,30 @@
 import { fail, type Actions, type RequestEvent } from '@sveltejs/kit';
 import { config } from '$lib/selfkit.config';
 import { EmailService } from '$lib/server/email/emailService';
-import type { PageServerLoad } from '../app/$types';
+import { superValidate, setError } from 'sveltekit-superforms';
+import { zod } from 'sveltekit-superforms/adapters';
+import { contactSchema } from '$lib/forms/schemas/contactSchema';
 
-export const load: PageServerLoad = async () => {
+export async function load() {
 	return {
+		form: await superValidate(zod(contactSchema)),
+		// For meta tags
 		pageName: 'Contact Us',
 		description:
 			"Get in touch with our team. We're here to help with any questions about our services, support needs, or partnership opportunities"
 	};
-};
+}
 
 export const actions: Actions = {
 	default: async (event: RequestEvent) => {
-		const formData = await event.request.formData();
-		const email = formData.get('email');
-		const subject = formData.get('subject');
-		const message = formData.get('message');
-
-		if (typeof email !== 'string' || typeof subject !== 'string' || typeof message !== 'string') {
-			return fail(400, { error: 'Invalid or missing fields' });
+		const form = await superValidate(event, zod(contactSchema));
+		if (!form.valid) {
+			return fail(400, {
+				form
+			});
 		}
 
-		if (!email || !subject || !message) {
-			return fail(400, { error: 'All fields are required' });
-		}
+		const { email, subject, message } = form.data;
 
 		const { error } = await EmailService.send({
 			from: config.emailNoreply,
@@ -34,15 +34,15 @@ export const actions: Actions = {
 		});
 
 		if (error) {
-			return {
-				success: false,
-				message: 'An error occurred when sending the email, please try again later.'
-			};
+			return setError(
+				form,
+				'message',
+				'An error occurred when sending the email, please try again later.'
+			);
 		}
 
 		return {
-			success: true,
-			message: 'Your message has been sent successfully!'
+			form
 		};
 	}
 };

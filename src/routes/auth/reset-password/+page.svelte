@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import Input from '$lib/components/ui/input/input.svelte';
+	import PasswordResetForm from '$lib/components/forms/passwordResetForm.svelte';
+	import type { PasswordResetSchema } from '$lib/forms/schemas/resetPasswordSchema';
 	import * as m from '$lib/paraglide/messages.js';
+	import type { SuperValidated, Infer } from 'sveltekit-superforms';
 
-	let { form } = $props();
+	let { data }: { data: { form: SuperValidated<Infer<PasswordResetSchema>> } } = $props();
 </script>
 
 <div class="  mx-auto sm:max-w-[350px] p-5 sm:p-0">
@@ -12,19 +12,7 @@
 		<div>
 			<h1 class="text-2xl font-bold">{m.these_polite_orangutan_compose()}</h1>
 		</div>
-		<form class="flex flex-col gap-3 items-center" method="post" use:enhance>
-			<Input
-				type="password"
-				id="form-reset.password"
-				name="password"
-				autocomplete="new-password"
-				required
-				placeholder="New password"
-			/>
-			<Button class="w-full" type="submit">{m.dry_broad_moth_leap()}</Button>
-			{#if form?.message}
-				<p class="text-destructive">{form.message ?? ''}</p>
-			{/if}
-		</form>
+
+		<PasswordResetForm form={data.form} />
 	</div>
 </div>

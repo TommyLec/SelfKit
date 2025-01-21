@@ -1,15 +1,16 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
 	import { createChallenge } from '$lib/client/webauthn';
 	import { encodeBase64 } from '@oslojs/encoding';
 	import { goto } from '$app/navigation';
 	import Button from '$lib/components/ui/button/button.svelte';
-	import Input from '$lib/components/ui/input/input.svelte';
 	import Icon from '@iconify/svelte';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as m from '$lib/paraglide/messages.js';
+	import type { LoginSchema } from '$lib/forms/schemas/loginSchema';
+	import type { SuperValidated, Infer } from 'sveltekit-superforms';
+	import LoginForm from '$lib/components/forms/loginForm.svelte';
 
-	let { form } = $props();
+	let { data }: { data: { form: SuperValidated<Infer<LoginSchema>> } } = $props();
 
 	let passkeyErrorMessage = $state('');
 
@@ -48,41 +49,14 @@
 	}
 </script>
 
-<div class="  mx-auto sm:max-w-[350px] p-5 sm:p-0">
-	<div class="grid gap-6 text-center">
-		<div>
+<div class="mx-auto sm:max-w-[350px] p-5 sm:p-0">
+	<div class="grid gap-6">
+		<div class="text-center">
 			<h1 class="text-2xl font-bold">{m.plane_loved_myna_ripple()}</h1>
 			<p class="text-sm text-muted-foreground">{m.least_new_butterfly_strive()}</p>
 		</div>
 
-		<form class="grid gap-2" method="post" use:enhance>
-			<Input
-				type="email"
-				id="form-login.email"
-				name="email"
-				autocomplete="email"
-				placeholder="Email"
-				required
-				value={form?.email ?? ''}
-			/>
-			<Input
-				type="password"
-				id="form-login.password"
-				name="password"
-				autocomplete="current-password"
-				placeholder="Password"
-				required
-			/>
-
-			<Button id="login-button" data-umami-event="Login button" data-umami-event-type="Standard" type="submit">{m.crazy_plain_seal_believe()}</Button>
-
-			{#if passkeyErrorMessage}
-				<p class="text-sm text-destructive-foreground">{passkeyErrorMessage}</p>
-			{/if}
-			{#if form?.message}
-				<p class="text-destructive">{form.message ?? ''}</p>
-			{/if}
-		</form>
+		<LoginForm form={data.form} />
 
 		<div class="relative">
 			<div class="absolute inset-0 flex items-center"><span class="w-full border-t"></span></div>
@@ -92,10 +66,24 @@
 		</div>
 
 		<div class="grid gap-2">
-			<Button id="google-button" data-umami-event="Login button" data-umami-event-type="Google" variant="outline" href="/auth/google"><Icon icon="devicon:google" />Google</Button>
-			<Button id="passkey-button" data-umami-event="Login button" data-umami-event-type="Passkey" variant="outline" onclick={handleSignin}
+			<Button
+				id="google-button"
+				data-umami-event="Login button"
+				data-umami-event-type="Google"
+				variant="outline"
+				href="/auth/google"><Icon icon="devicon:google" />Google</Button
+			>
+			<Button
+				id="passkey-button"
+				data-umami-event="Login button"
+				data-umami-event-type="Passkey"
+				variant="outline"
+				onclick={handleSignin}
 				><Icon icon="material-symbols:passkey" />{m.next_safe_ox_gasp()}</Button
 			>
+			{#if passkeyErrorMessage}
+				<p class="text-sm text-destructive-foreground">{passkeyErrorMessage}</p>
+			{/if}
 		</div>
 
 		<div class="flex justify-center items-center h-5">

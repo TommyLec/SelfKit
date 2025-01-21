@@ -7,7 +7,7 @@
 			items: [
 				{
 					name: 'Pricing',
-					href: '/'
+					href: '/payment'
 				},
 				{
 					name: 'FAQ',
