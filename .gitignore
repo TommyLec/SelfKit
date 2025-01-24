@@ -22,3 +22,7 @@ vite.config.ts.timestamp-*
 
 # Vscode
 .vscode*
+
+# Coolify
+coolify.config.json
+deploy.config.json
