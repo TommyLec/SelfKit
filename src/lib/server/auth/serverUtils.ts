@@ -1,4 +1,4 @@
-import { redirect } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import type { PasswordResetSession } from './password-reset';
 import type { User } from './user';
 import { get2FARedirect, getPasswordReset2FARedirect } from './2fa';
@@ -128,4 +128,21 @@ export function checkSubscription(subscriptions: SubscriptionDetails[]) {
 	);
 	if (!result) return redirect(302, '/payment');
 	return null;
+}
+
+export function checkApiAuthorization(locals: App.Locals) {
+	if (locals.session === null || locals.user === null) {
+		return fail(401, {
+			password: {
+				message: 'Not authenticated'
+			}
+		});
+	}
+	if (locals.user.registered2FA && !locals.session.twoFactorVerified) {
+		return fail(403, {
+			password: {
+				message: 'Forbidden'
+			}
+		});
+	}
 }

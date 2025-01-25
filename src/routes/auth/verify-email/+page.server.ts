@@ -11,6 +11,7 @@ import { invalidateUserPasswordResetSessions } from '$lib/server/auth/password-r
 import { ExpiringTokenBucket } from '$lib/server/auth/rate-limit';
 import { updateUserEmailAndSetEmailAsVerified } from '$lib/server/auth/user';
 import { fail, redirect, type Actions, type RequestEvent } from '@sveltejs/kit';
+import { dev } from '$app/environment';
 
 export async function load(event: RequestEvent) {
 	if (event.locals.user === null) {
@@ -168,6 +169,9 @@ async function resendEmail(event: RequestEvent) {
 			verificationRequest.email
 		);
 	}
+
+	if (dev) console.log(verificationRequest.code);
+
 	await sendVerificationEmail(verificationRequest.email, verificationRequest.code);
 	setEmailVerificationRequestCookie(event, verificationRequest);
 	return {

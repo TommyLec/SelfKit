@@ -26,5 +26,8 @@
 		<p class="text-sm text-muted-foreground">
 			{m.many_formal_gopher_drop()}
 		</p>
+
+		<Button href="/app" class="underline" variant="ghost">{m.mild_elegant_stork_view()}</Button>
 	</div>
+
 </div>

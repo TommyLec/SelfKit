@@ -1,5 +1,7 @@
+import { emailChangeSchema } from '$lib/forms/schemas/emailChangeSchema';
+import { passwordChangeSchema } from '$lib/forms/schemas/passwordChangeSchema';
 import { get2FARedirect } from '$lib/server/auth/2fa';
-import { verifyEmailInput, checkEmailAvailability } from '$lib/server/auth/email';
+import { checkEmailAvailability } from '$lib/server/auth/email';
 import {
 	sendVerificationEmailBucket,
 	createEmailVerificationRequest,
@@ -8,6 +10,7 @@ import {
 } from '$lib/server/auth/email-verification';
 import { verifyPasswordStrength, verifyPasswordHash } from '$lib/server/auth/password';
 import { ExpiringTokenBucket } from '$lib/server/auth/rate-limit';
+import { checkApiAuthorization } from '$lib/server/auth/serverUtils';
 import {
 	invalidateUserSessions,
 	generateSessionToken,
@@ -30,6 +33,8 @@ import {
 } from '$lib/server/auth/webauthn';
 import { decodeBase64 } from '@oslojs/encoding';
 import { type RequestEvent, redirect, type Actions, fail } from '@sveltejs/kit';
+import { superValidate, setError } from 'sveltekit-superforms';
+import { zod } from 'sveltekit-superforms/adapters';
 
 const passwordUpdateBucket = new ExpiringTokenBucket<string>(5, 60 * 30);
 
@@ -50,7 +55,9 @@ export async function load(event: RequestEvent) {
 		recoveryCode,
 		user: event.locals.user,
 		passkeyCredentials,
-		securityKeyCredentials
+		securityKeyCredentials,
+		emailChangeForm: await superValidate(zod(emailChangeSchema)),
+		passwordChangeForm: await superValidate(zod(passwordChangeSchema))
 	};
 }
 
@@ -64,146 +71,82 @@ export const actions: Actions = {
 };
 
 async function updatePasswordAction(event: RequestEvent) {
-	if (event.locals.session === null || event.locals.user === null) {
-		return fail(401, {
-			password: {
-				message: 'Not authenticated'
-			}
-		});
-	}
-	if (event.locals.user.registered2FA && !event.locals.session.twoFactorVerified) {
-		return fail(403, {
-			password: {
-				message: 'Forbidden'
-			}
-		});
-	}
-	if (!passwordUpdateBucket.check(event.locals.session.id, 1)) {
-		return fail(429, {
-			password: {
-				message: 'Too many requests'
-			}
+	checkApiAuthorization(event.locals);
+
+	const form = await superValidate(event, zod(passwordChangeSchema));
+	if (!form.valid) {
+		return fail(400, {
+			form
 		});
 	}
 
-	const formData = await event.request.formData();
-	const password = formData.get('password');
-	const newPassword = formData.get('new_password');
-	if (typeof password !== 'string' || typeof newPassword !== 'string') {
-		return fail(400, {
-			password: {
-				message: 'Invalid or missing fields'
-			}
-		});
+	if (!passwordUpdateBucket.check(event.locals.session!.id, 1)) {
+		return setError(form, 'confirmPassword', 'Too many requests, try again later.');
 	}
+
+	const { currentPassword, newPassword } = form.data;
+
 	const strongPassword = await verifyPasswordStrength(newPassword);
 	if (!strongPassword) {
-		return fail(400, {
-			password: {
-				message: 'Weak password'
-			}
-		});
+		return setError(form, 'newPassword', 'Weak password.');
 	}
 
-	if (!passwordUpdateBucket.consume(event.locals.session.id, 1)) {
-		return fail(429, {
-			password: {
-				message: 'Too many requests'
-			}
-		});
+	if (!passwordUpdateBucket.consume(event.locals.session!.id, 1)) {
+		return setError(form, 'confirmPassword', 'Too many requests, try again later.');
 	}
-	const passwordHash = await getUserPasswordHash(event.locals.user.id);
+
+	const passwordHash = await getUserPasswordHash(event.locals.user!.id);
+
 	if (passwordHash) {
-		const validPassword = await verifyPasswordHash(passwordHash, password);
+		const validPassword = await verifyPasswordHash(passwordHash, currentPassword);
 		if (!validPassword) {
-			return fail(400, {
-				password: {
-					message: 'Incorrect password'
-				}
-			});
+			return setError(form, 'currentPassword', 'Incorrect password.');
 		}
 	}
-	passwordUpdateBucket.reset(event.locals.session.id);
-	await invalidateUserSessions(event.locals.user.id);
-	await updateUserPassword(event.locals.user.id, newPassword);
+	passwordUpdateBucket.reset(event.locals.session!.id);
+	await invalidateUserSessions(event.locals.user!.id);
+	await updateUserPassword(event.locals.user!.id, newPassword);
 
 	const sessionToken = generateSessionToken();
 	const sessionFlags: SessionFlags = {
-		twoFactorVerified: event.locals.session.twoFactorVerified
+		twoFactorVerified: event.locals.session!.twoFactorVerified
 	};
-	const session = await createSession(sessionToken, event.locals.user.id, sessionFlags);
+	const session = await createSession(sessionToken, event.locals.user!.id, sessionFlags);
 	setSessionTokenCookie(event, sessionToken, session.expiresAt);
+
 	return {
-		password: {
-			message: 'Updated password'
-		}
+		form
 	};
 }
 
 async function updateEmailAction(event: RequestEvent) {
-	if (event.locals.session === null || event.locals.user === null) {
-		return fail(401, {
-			email: {
-				message: 'Not authenticated'
-			}
-		});
-	}
-	if (event.locals.user.registered2FA && !event.locals.session.twoFactorVerified) {
-		return fail(403, {
-			email: {
-				message: 'Forbidden'
-			}
-		});
-	}
-	if (!sendVerificationEmailBucket.check(event.locals.user.id, 1)) {
-		return fail(429, {
-			email: {
-				message: 'Too many requests'
-			}
+	checkApiAuthorization(event.locals);
+
+	const form = await superValidate(event, zod(emailChangeSchema));
+	if (!form.valid) {
+		return fail(400, {
+			form
 		});
 	}
 
-	const formData = await event.request.formData();
-	const email = formData.get('email');
-	if (typeof email !== 'string') {
-		return fail(400, {
-			email: {
-				message: 'Invalid or missing fields'
-			}
-		});
+	if (!sendVerificationEmailBucket.check(event.locals.user!.id, 1)) {
+		return setError(form, 'newEmail', 'Too many requests, try again later.');
 	}
-	if (email === '') {
-		return fail(400, {
-			email: {
-				message: 'Please enter your email'
-			}
-		});
-	}
-	if (!verifyEmailInput(email)) {
-		return fail(400, {
-			email: {
-				message: 'Please enter a valid email'
-			}
-		});
-	}
-	const emailAvailable = await checkEmailAvailability(email);
+
+	const { newEmail } = form.data;
+
+	const emailAvailable = await checkEmailAvailability(newEmail);
 	if (!emailAvailable) {
-		return fail(400, {
-			email: {
-				message: 'This email is already used'
-			}
-		});
+		return setError(form, 'newEmail', 'This email is already used.');
 	}
-	if (!sendVerificationEmailBucket.consume(event.locals.user.id, 1)) {
-		return fail(429, {
-			email: {
-				message: 'Too many requests'
-			}
-		});
+	if (!sendVerificationEmailBucket.consume(event.locals.user!.id, 1)) {
+		return setError(form, 'newEmail', 'Too many requests, try again later.');
 	}
-	const verificationRequest = await createEmailVerificationRequest(event.locals.user.id, email);
+
+	const verificationRequest = await createEmailVerificationRequest(event.locals.user!.id, newEmail);
 	await sendVerificationEmail(verificationRequest.email, verificationRequest.code);
 	setEmailVerificationRequestCookie(event, verificationRequest);
+
 	return redirect(302, '/auth/verify-email');
 }
 

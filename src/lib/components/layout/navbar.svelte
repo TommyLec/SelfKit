@@ -18,6 +18,10 @@
 			href: '/'
 		},
 		{
+			title: 'Pricing',
+			href: '/payment'
+		},
+		{
 			title: 'Contact',
 			href: '/contact'
 		},
@@ -59,7 +63,7 @@
 
 <nav
 	aria-label="Site menu"
-	class="flex items-center justify-between top-0 w-full h-[55px] backdrop-blur-xl border-b px-3 z-50"
+	class="flex items-center justify-between sticky top-0 w-full h-[55px] backdrop-blur-xl border-b px-3 z-50"
 >
 	<div class="grow basis-1 ml-2 hidden md:block">
 		<a class="flex items-center gap-2 w-fit" aria-label="SelfKit" href="/">
