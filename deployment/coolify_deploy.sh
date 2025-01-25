@@ -32,11 +32,11 @@ make_api_call() {
     local response
     if [ -z "$payload" ]; then
         response=$(curl -s -w "\n%{http_code}" -X "$method" \
-            "${COOLIFY_URL}:8000/api/v1/${endpoint}" \
+            "http://${COOLIFY_IP}:8000/api/v1/${endpoint}" \
             -H "Authorization: Bearer ${COOLIFY_TOKEN}")
     else
         response=$(curl -s -w "\n%{http_code}" -X "$method" \
-            "${COOLIFY_URL}:8000/api/v1/${endpoint}" \
+            "http://${COOLIFY_IP}:8000/api/v1/${endpoint}" \
             -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
             -H "Content-Type: application/json" \
             -d "$payload")
@@ -278,22 +278,6 @@ if [ -z "$PLUNK_FQDN" ]; then
     echo "Warning: Could not get Plunk FQDN"
 fi
 
-# Get Github app UUID
-echo "Getting Github app UUID..."
-GITHUB_APP_RESPONSE=$(make_api_call "GET" "security/keys")
-
-# Check if response is valid JSON
-if ! echo "$GITHUB_APP_RESPONSE" | jq . >/dev/null 2>&1; then
-    echo "Error: Invalid GitHub app response - $GITHUB_APP_RESPONSE"
-    exit 1
-fi
-
-GITHUB_APP_UUID=$(echo "$GITHUB_APP_RESPONSE" | jq -r --arg name "$GITHUB_APP_NAME" '.[] | select(.name==$name) | .uuid // empty')
-if [ -z "$GITHUB_APP_UUID" ]; then
-    echo "Error: Could not get GitHub app UUID for app name: $GITHUB_APP_NAME"
-    exit 1
-fi
-
 # Create application
 echo "Creating application..."
 APP_PAYLOAD=$(cat << EOF
@@ -339,86 +323,80 @@ echo "Application created successfully!"
 # Add environment variables
 echo "Adding environment variables..."
 ENCRYPTION_KEY=$(generate_random 16)
-ENV_VARS_PAYLOAD=$(cat << EOF
+ENV_VARS_PAYLOAD_1=$(cat << EOF
 {
-    "data": [
-        {
-            "key": "PLUNK_URL",
-            "value": "$PLUNK_FQDN",
-            "is_preview": "true",
-            "is_shown_once": "true"
-        },
-        {
-            "key": "DB_CONNECTION_STRING",
-            "value": "postgresql://$DB_USER:$DB_PASSWORD@$COOLIFY_URL:5432/$DB_NAME",
-            "is_preview": "true",
-            "is_shown_once": "true"
-        },
-        {
-            "key": "GOOGLE_CLIENT_ID",
-            "value": "",
-            "is_preview": "true",
-            "is_shown_once": "true"
-        },
-        {
-            "key": "GOOGLE_CLIENT_SECRET",
-            "value": "",
-            "is_preview": "true",
-            "is_shown_once": "true"
-        },
-        {
-            "key": "GOOGLE_REDIRECT_URI",
-            "value": "http://APP_URI/auth/google/callback",
-            "is_preview": "true",
-            "is_shown_once": "true"
-        },
-        {
-            "key": "PADDLE_API_KEY",
-            "value": "",
-            "is_preview": "true",
-            "is_shown_once": "true"
-        },
-        {
-            "key": "PUBLIC_PADDLE_CLIENT_TOKEN",
-            "value": "",
-            "is_preview": "true",
-            "is_shown_once": "true"
-        },
-        {
-            "key": "PADDLE_PRODUCTS_WEBHOOK_KEY",
-            "value": "",
-            "is_preview": "true",
-            "is_shown_once": "true"
-        },
-        {
-            "key": "PADDLE_SUBSCRIPTION_WEBHOOK_KEY",
-            "value": "",
-            "is_preview": "true",
-            "is_shown_once": "true"
-        },
-        {
-            "key": "ENCRYPTION_KEY",
-            "value": "$ENCRYPTION_KEY",
-            "is_preview": "true",
-            "is_shown_once": "true"
-        }
-    ]
+    "key": "PLUNK_URL",
+    "value": "$PLUNK_FQDN"
+}
+EOF
+)
+ENV_VARS_PAYLOAD_2=$(cat << EOF
+{
+    "key": "DB_CONNECTION_STRING",
+    "value": "postgresql://$DB_USER:$DB_PASSWORD@$COOLIFY_IP:5432/$DB_NAME"
+}
+EOF
+)
+ENV_VARS_PAYLOAD_3=$(cat << EOF
+{
+    "key": "GOOGLE_CLIENT_ID",
+    "value": ""
+}
+EOF
+)
+ENV_VARS_PAYLOAD_4=$(cat << EOF
+{
+    "key": "GOOGLE_CLIENT_SECRET",
+    "value": ""
+}
+EOF
+)
+ENV_VARS_PAYLOAD_5=$(cat << EOF
+{
+    "key": "GOOGLE_REDIRECT_URI",
+    "value": "http://$APP_URI/auth/google/callback"
+}
+EOF
+)
+ENV_VARS_PAYLOAD_6=$(cat << EOF
+{
+    "key": "PADDLE_API_KEY",
+    "value": ""
+}
+EOF
+)
+ENV_VARS_PAYLOAD_7=$(cat << EOF
+{
+    "key": "PADDLE_SUBSCRIPTION_WEBHOOK_KEY",
+    "value": ""
+}
+EOF
+)
+ENV_VARS_PAYLOAD_8=$(cat << EOF
+{
+    "key": "PADDLE_PRODUCTS_WEBHOOK_KEY",
+    "value": ""
+}
+EOF
+)
+ENV_VARS_PAYLOAD_9=$(cat << EOF
+{
+    "key": "ENCRYPTION_KEY",
+    "value": "$ENCRYPTION_KEY"
 }
 EOF
 )
 
-ENV_VARS_RESPONSE=$(make_api_call "POST" "services/$APP_UUID/envs/bulk" "$ENV_VARS_PAYLOAD")
-
-# Check if response is valid JSON
-if ! echo "$ENV_VARS_RESPONSE" | jq . >/dev/null 2>&1; then
-    echo "Error: Invalid environment variables response - $ENV_VARS_RESPONSE"
-    exit 1
-fi
-
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to create environment variables - $ENV_VARS_RESPONSE"
-    exit 1
-fi
+ENV_VARS_RESPONSE=$(make_api_call "POST" "applications/$APP_UUID/envs" "$ENV_VARS_PAYLOAD_1")
+ENV_VARS_RESPONSE=$(make_api_call "POST" "applications/$APP_UUID/envs" "$ENV_VARS_PAYLOAD_2")
+ENV_VARS_RESPONSE=$(make_api_call "POST" "applications/$APP_UUID/envs" "$ENV_VARS_PAYLOAD_3")
+ENV_VARS_RESPONSE=$(make_api_call "POST" "applications/$APP_UUID/envs" "$ENV_VARS_PAYLOAD_4")
+ENV_VARS_RESPONSE=$(make_api_call "POST" "applications/$APP_UUID/envs" "$ENV_VARS_PAYLOAD_5")
+ENV_VARS_RESPONSE=$(make_api_call "POST" "applications/$APP_UUID/envs" "$ENV_VARS_PAYLOAD_6")
+ENV_VARS_RESPONSE=$(make_api_call "POST" "applications/$APP_UUID/envs" "$ENV_VARS_PAYLOAD_7")
+ENV_VARS_RESPONSE=$(make_api_call "POST" "applications/$APP_UUID/envs" "$ENV_VARS_PAYLOAD_8")
+ENV_VARS_RESPONSE=$(make_api_call "POST" "applications/$APP_UUID/envs" "$ENV_VARS_PAYLOAD_9")
+ENV_VARS_RESPONSE=$(make_api_call "POST" "applications/$APP_UUID/envs" "$ENV_VARS_PAYLOAD_10")
 
 echo "Environment variables created successfully!"
 
