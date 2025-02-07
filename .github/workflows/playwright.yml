@@ -25,8 +25,8 @@ jobs:
       env:
         USE_MOCK_DATA: true
       run: |
-        pnpm run dev &
-        npx wait-on http://localhost:5173
+        pnpm run preview &
+        npx wait-on http://localhost:4173 --timeout 60000
     - name: Run Playwright tests
       run: pnpm exec playwright test
     - uses: actions/upload-artifact@v4
