@@ -21,14 +21,13 @@ jobs:
       run: pnpm exec playwright install --with-deps
     - name: Build
       run: pnpm run build
-    - name: Run app
+    - name: Run app and e2e tests
       env:
         USE_MOCK_DATA: true
       run: |
         pnpm run preview &
         npx wait-on http://localhost:4173 --timeout 60000
-    - name: Run Playwright tests
-      run: pnpm exec playwright test
+        pnpm exec playwright test
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:
