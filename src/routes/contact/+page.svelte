@@ -5,6 +5,7 @@
 	import type { SuperValidated, Infer } from 'sveltekit-superforms';
 
 	let { data }: { data: { form: SuperValidated<Infer<ContactSchema>> } } = $props();
+	$inspect(data.form)
 </script>
 
 <div class="mx-auto sm:max-w-[350px] p-5 sm:p-0 my-20">
