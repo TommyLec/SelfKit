@@ -13,6 +13,7 @@
 	const contactForm = superForm(form, {
 		validators: zodClient(contactSchema),
 		onUpdated({ form }) {
+			console.log("form : ", form.data, form.valid);
 			if (form.valid) {
 				toast.success('Email successfully send!');
 			}
@@ -22,7 +23,7 @@
 	const { form: formData, enhance } = contactForm;
 </script>
 
-<form method="post" use:enhance>
+<form method="post" action="?/send" use:enhance>
 	<Form.Field form={contactForm} name="email">
 		<Form.Control>
 			{#snippet children({ props })}

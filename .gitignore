@@ -26,3 +26,9 @@ vite.config.ts.timestamp-*
 # Coolify
 coolify.config.json
 deploy.config.json
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
